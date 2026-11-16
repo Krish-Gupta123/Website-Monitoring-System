@@ -1,0 +1,1199 @@
+{
+  "name": "Website Monitoring System",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -512,
+        320
+      ],
+      "id": "7c99b1a8-9004-4cf5-8d62-06a3b67da3f8",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const websites = [\n  { name: \"Google\", url: \"https://www.google.com\" },\n  { name: \"Testing\", url: \"https://testingn8nhello.com\" },\n  { name: \"Portfolio\", url: \"https://portfolio-zeta-sandy-42.vercel.app/\" },\n  { name: \"Test Redirect (3xx)\", url: \"https://httpbin.org/status/301\" },\n  { name: \"Test Client Error (4xx)\", url: \"https://httpbin.org/status/404\" },\n  { name: \"Test Server Error (5xx)\", url: \"https://httpbin.org/status/503\" }\n];\n\nreturn websites.map(site => ({ json: site }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        320
+      ],
+      "id": "46473cde-4d5c-42eb-9404-eb3758a7b1d9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        32,
+        320
+      ],
+      "id": "3a7f4976-6b4f-474c-8ee5-6d207466416d",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item;\n\nreturn {\n  json: {\n    ...item.json,\n    requestStartedAt: Date.now()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        336
+      ],
+      "id": "7d4b5333-7500-4f5d-95c8-6d2f79e00aeb",
+      "name": "Start Timer"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        576,
+        336
+      ],
+      "id": "0c625d5c-924d-42c1-95e2-d028bcd07f9d",
+      "name": "HTTP Request",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const response = $input.item.json;\nconst original = $('Start Timer').item.json;\n\nconst responseTimeMs = Date.now() - original.requestStartedAt;\n\nlet performanceStatus;\nif (responseTimeMs < 500) {\n  performanceStatus = \"Fast\";\n} else if (responseTimeMs < 1000) {\n  performanceStatus = \"Normal\";\n} else if (responseTimeMs <= 3000) {\n  performanceStatus = \"Slow\";\n} else {\n  performanceStatus = \"Very Slow\";\n}\n\n// drop the (large) response body, it is not needed downstream\nconst { data, ...rest } = response;\n\nreturn {\n  json: {\n    ...rest,\n    name: original.name,\n    url: original.url,\n    responseTimeMs,\n    performanceStatus\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        192
+      ],
+      "id": "7551d1a1-5643-4399-b841-491823568625",
+      "name": "Calculate Response Time"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const error = $input.item.json;\nconst original = $('Start Timer').item.json;\n\nreturn {\n  json: {\n    ...error,\n    name: original.name,\n    url: original.url,\n    responseTimeMs: Date.now() - original.requestStartedAt\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        720
+      ],
+      "id": "010baa5d-a726-45dd-9075-10bd85716157",
+      "name": "Unreachable Website"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// join point for the success path and the error path, drops the big response body\nconst { data, ...rest } = $input.item.json;\nreturn { json: rest };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        336
+      ],
+      "id": "d187118d-9f04-4396-9f8a-bd5086f5e055",
+      "name": "Prepare Check"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ea58HimPI9hOAgdN",
+          "mode": "list",
+          "cachedResultName": "monitor_state",
+          "cachedResultUrl": "/projects/QSG2qgG8NjoYHkb8/datatables/ea58HimPI9hOAgdN"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "url",
+              "keyValue": "={{ $json.url }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        336
+      ],
+      "id": "c67b070e-cc79-4cb1-b8e1-3f2fc8c1aff0",
+      "name": "Get Previous State",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ===== Status change detection (uses monitor_state data table) =====\nconst cur = $('Prepare Check').item.json;   // current check result\nconst prev = $input.item.json || {};        // row from monitor_state (empty on first check)\n\nconst hasPrev = prev.lastState !== undefined && prev.lastState !== null && prev.lastState !== '';\nconst prevState = hasPrev ? prev.lastState : null;\n\n// ---- current state\nconst code = Number(cur.statusCode);\nconst hasCode = cur.statusCode !== undefined && cur.statusCode !== null &&\n                cur.statusCode !== '' && !Number.isNaN(code);\n\nlet state;\nif (!hasCode) state = 'UNREACHABLE';\nelse if (code >= 200 && code < 300) state = 'UP';\nelse if (code >= 300 && code < 400) state = 'REDIRECT';\nelse if (code >= 400 && code < 500) state = 'HTTP_ERROR';\nelse if (code >= 500 && code < 600) state = 'SERVER_ERROR';\nelse state = 'UNKNOWN';\n\n// 2xx and 3xx count as uptime\nconst available = state === 'UP' || state === 'REDIRECT';\nconst prevAvailable = prevState === null ? null : (prevState === 'UP' || prevState === 'REDIRECT');\n\nconst nowMs = Date.now();\nconst nowISO = new Date(nowMs).toISOString();\n\n// ---- change detection\nlet statusChanged = false;\nlet alertType = 'NONE';\nif (prevState === null) {\n  // first ever check: silent if healthy, alert if not\n  if (state !== 'UP') { statusChanged = true; alertType = 'INITIAL_PROBLEM'; }\n} else if (state !== prevState) {\n  statusChanged = true;\n  if (available && !prevAvailable) alertType = 'RECOVERED';\n  else if (!available && prevAvailable) alertType = 'WENT_DOWN';\n  else alertType = 'STATUS_CHANGED';\n}\n\n// ---- counters\nconst totalChecks = (Number(prev.totalChecks) || 0) + 1;\nconst upChecks = (Number(prev.upChecks) || 0) + (available ? 1 : 0);\nlet incidents = Number(prev.incidents) || 0;\nif (!available && (prevState === null || prevAvailable)) incidents += 1;\n\n// ---- lastChangeAt = last time the site went down or came back (availability flip)\nconst prevChange = prev.lastChangeAt ? new Date(prev.lastChangeAt) : null;\nconst prevChangeValid = prevChange && !Number.isNaN(prevChange.getTime());\nconst flipped = prevState === null || available !== prevAvailable;\nconst lastChangeAt = flipped || !prevChangeValid ? nowISO : prevChange.toISOString();\n\n// ---- downtime (only on recovery)\nlet downtimeMs = null;\nif (available && prevState !== null && !prevAvailable && prevChangeValid) {\n  downtimeMs = nowMs - prevChange.getTime();\n}\nconst fmtDur = (t) => {\n  if (t === null || t === undefined) return '';\n  const sec = Math.round(t / 1000);\n  const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600);\n  const m = Math.floor((sec % 3600) / 60), r = sec % 60;\n  return [d && d + 'd', h && h + 'h', m && m + 'm', (r || (!d && !h && !m)) && r + 's']\n    .filter(Boolean).join(' ');\n};\n\nreturn {\n  json: {\n    ...cur,\n    state,\n    available,\n    previousState: prevState,\n    statusChanged,\n    alertType,\n    downtimeMs,\n    downtimeText: fmtDur(downtimeMs),\n    totalChecks,\n    upChecks,\n    incidents,\n    uptimePercent: Math.round((upChecks / totalChecks) * 10000) / 100,\n    lastChangeAt,\n    checkedAtISO: nowISO\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        336
+      ],
+      "id": "4d79c29d-2b32-48db-a8ec-ed1b9c696405",
+      "name": "Status Tracker"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ea58HimPI9hOAgdN",
+          "mode": "list",
+          "cachedResultName": "monitor_state",
+          "cachedResultUrl": "/projects/QSG2qgG8NjoYHkb8/datatables/ea58HimPI9hOAgdN"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "url",
+              "keyValue": "={{ $json.url }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ $json.url }}",
+            "name": "={{ $json.name }}",
+            "lastState": "={{ $json.state }}",
+            "lastChangeAt": "={{ $json.lastChangeAt }}",
+            "totalChecks": "={{ $json.totalChecks }}",
+            "upChecks": "={{ $json.upChecks }}",
+            "incidents": "={{ $json.incidents }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        336
+      ],
+      "id": "9de9ca90-4c27-4a7d-82d6-452469b021ca",
+      "name": "Save Current State"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "IIwYRtddseTXX5f0",
+          "mode": "list",
+          "cachedResultName": "check_history",
+          "cachedResultUrl": "/projects/QSG2qgG8NjoYHkb8/datatables/IIwYRtddseTXX5f0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ $('Status Tracker').item.json.url }}",
+            "checkedAt": "={{ $('Status Tracker').item.json.checkedAtISO }}",
+            "state": "={{ $('Status Tracker').item.json.state }}",
+            "statusCode": "={{ $('Status Tracker').item.json.statusCode ?? null }}",
+            "responseTimeMs": "={{ $('Status Tracker').item.json.responseTimeMs ?? null }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        336
+      ],
+      "id": "16af5359-f664-41e5-973d-238982a1a615",
+      "name": "Save Check History"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Data Table nodes replace $json with a table row, so bring the full result back\nreturn { json: $('Status Tracker').item.json };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        336
+      ],
+      "id": "52cec387-1927-4229-9f31-7ae774de7701",
+      "name": "Restore Result"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f6927114-5e33-4719-8c98-6548f377cf84",
+              "leftValue": "={{ $json.statusChanged }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2368,
+        336
+      ],
+      "id": "b3820d66-e4a1-4731-86d7-6bfc5c2a51ac",
+      "name": "Status Changed?"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "35bb7dc8-685e-4f0a-aea3-0f1a95ba4d05",
+                    "leftValue": "={{ Number($json.statusCode) >= 200 && Number($json.statusCode) < 300 ? 1 : 0 }}",
+                    "rightValue": "=1",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Website UP"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "d94506c2-4637-405e-bda3-881303a65f68",
+                    "leftValue": "={{ Number($json.statusCode) >= 300 && Number($json.statusCode) < 400 ? 1 : 0 }}",
+                    "rightValue": "=1",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Website Redirected"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "f0708966-a3e7-4f78-bfef-a1f50421a635",
+                    "leftValue": "={{ Number($json.statusCode) >= 400 && Number($json.statusCode) < 500 ? 1 : 0 }}",
+                    "rightValue": "=1",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HTTP Error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "9daa8171-158a-41b1-8b78-ded0c13523ef",
+                    "leftValue": "={{ Number($json.statusCode) >= 500 && Number($json.statusCode) < 600 ? 1 : 0 }}",
+                    "rightValue": "=1",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Server Error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 4
+                },
+                "conditions": [
+                  {
+                    "id": "71e0e0cc-498d-491e-b2f9-f91ca8008aa4",
+                    "leftValue": "={{ $json.state }}",
+                    "rightValue": "UNREACHABLE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Unreachable"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Other"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        2592,
+        272
+      ],
+      "id": "56c94c59-3bf6-4289-a725-a6642c01b476",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "198c7cbc-1040-4cff-83a3-39262775c5c9",
+              "name": "Status",
+              "value": "Website UP",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2816,
+        -64
+      ],
+      "id": "3fcd50bc-af4c-4152-83ff-2074af6f2742",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "58a65fb0-b774-4541-9567-0214195b3c4c",
+              "name": "Status",
+              "value": "Website Redirected",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2816,
+        176
+      ],
+      "id": "7508d4ac-4636-446f-9226-4fdd20572541",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6f477c4d-31ae-476a-8b15-e5461e2f658c",
+              "name": "Status",
+              "value": "HTTP Error",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2816,
+        368
+      ],
+      "id": "1a57c245-7f00-4d5d-8f3b-9437585d27f4",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4c178e18-4184-4ad4-becc-c854059efd1d",
+              "name": "Status",
+              "value": "Server Error",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2816,
+        560
+      ],
+      "id": "9b6779e0-42dc-449f-9837-8a482ca6729f",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "sendTo": "2023.krish.gupta@ves.ac.in",
+        "subject": "=✅ [{{ $json.alertType === 'RECOVERED' ? 'RECOVERED' : 'STATUS CHANGE' }}] {{ $json.name }} is UP",
+        "message": "= <h2>{{ $json.alertType === 'RECOVERED' ? '✅ Website Recovered' : '✅ Website is UP' }}</h2> <p>Hello,</p> <p>{{ $json.alertType === 'RECOVERED' ? 'Good news! Your website was down earlier and is now responding normally again.' : 'Your website changed status and is now responding normally.' }}</p> <p> <strong>Website:</strong> {{ $json.name }}<br> <strong>URL:</strong> {{ $json.url }}<br> <strong>Status:</strong> {{ $json.Status }}<br> <strong>Previous Status:</strong> {{ $json.previousState || 'First check' }}<br> <strong>HTTP Status Code:</strong> {{ $json.statusCode }}<br> <strong>Status Message:</strong> {{ $json.statusMessage }}<br> <strong>Server:</strong> {{ $json.headers?.server || 'Not available' }}<br> <strong>Response Date:</strong> {{ $json.headers?.date || 'Not available' }}<br> <strong>Checked At:</strong> {{ $now.setZone('Asia/Kolkata').toFormat('dd LLL yyyy, hh:mm:ss a') }}<br> <strong>Response Time:</strong> {{ $json.responseTimeMs }} ms<br> <strong>Performance:</strong> {{ $json.performanceStatus }}<br> {{ $json.downtimeText ? '<strong>Total Downtime:</strong> ' + $json.downtimeText + '<br>' : '' }}</p> <p><strong>Uptime Statistics</strong><br> Uptime (all-time): {{ $json.uptimePercent ?? 'n/a' }}% over {{ $json.totalChecks }} checks<br> Total incidents: {{ $json.incidents }}</p> <p>Your website is healthy and responding successfully. No action is required.</p> <p>Regards,<br><strong>Website Monitoring System</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3056,
+        -64
+      ],
+      "id": "11cf6b30-6825-4a15-b5d1-f61e80155969",
+      "name": "Send a message1",
+      "webhookId": "e90e057f-fa01-4b70-8ebc-9e1b58cdf7bc",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dXJVtmm7dYtnzvrC",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "2023.krish.gupta@ves.ac.in",
+        "subject": "=⚠️ [REDIRECT] {{ $json.name }} Redirect Detected",
+        "message": "= <h2>⚠️ Website Redirect Detected</h2> <p>Hello,</p> <p>Our website monitoring system detected an HTTP redirection response while checking your website.</p> <p> <strong>Website:</strong> {{ $json.name }}<br> <strong>URL:</strong> {{ $json.url }}<br> <strong>Status:</strong> {{ $json.Status }}<br> <strong>Previous Status:</strong> {{ $json.previousState || 'First check' }}<br> <strong>HTTP Status Code:</strong> {{ $json.statusCode }}<br> <strong>Status Message:</strong> {{ $json.statusMessage }}<br> <strong>Server:</strong> {{ $json.headers?.server || 'Not available' }}<br> <strong>Response Date:</strong> {{ $json.headers?.date || 'Not available' }}<br> <strong>Checked At:</strong> {{ $now.setZone('Asia/Kolkata').toFormat('dd LLL yyyy, hh:mm:ss a') }}<br> <strong>Response Time:</strong> {{ $json.responseTimeMs }} ms<br> <strong>Performance:</strong> {{ $json.performanceStatus }}<br> {{ $json.downtimeText ? '<strong>Total Downtime:</strong> ' + $json.downtimeText + '<br>' : '' }}</p> <p><strong>Uptime Statistics</strong><br> Uptime (all-time): {{ $json.uptimePercent ?? 'n/a' }}% over {{ $json.totalChecks }} checks<br> Total incidents: {{ $json.incidents }}</p> <p><strong>Recommended Action:</strong></p> <ul> <li>Verify whether the redirect is intentional.</li> <li>Check whether the destination URL is correct.</li> <li>Ensure there are no unnecessary redirect loops.</li> </ul> <p>Please investigate if this redirect is unexpected.</p> <p>Regards,<br><strong>Website Monitoring System</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3056,
+        176
+      ],
+      "id": "fd0683f1-e66c-4002-ab1e-53069267cd40",
+      "name": "Send a message",
+      "webhookId": "3a46a2ba-fbf5-419a-b96b-b77e527a1757",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dXJVtmm7dYtnzvrC",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "2023.krish.gupta@ves.ac.in",
+        "subject": "=⚠️ [HTTP ERROR] {{ $json.name }} – {{ $json.statusCode }}",
+        "message": "= <h2>⚠️ Website Client Error Detected</h2> <p>Hello,</p> <p>Your website responded to our monitoring request but returned an HTTP client error.</p> <p> <strong>Website:</strong> {{ $json.name }}<br> <strong>URL:</strong> {{ $json.url }}<br> <strong>Status:</strong> {{ $json.Status }}<br> <strong>Previous Status:</strong> {{ $json.previousState || 'First check' }}<br> <strong>HTTP Status Code:</strong> {{ $json.statusCode }}<br> <strong>Status Message:</strong> {{ $json.statusMessage }}<br> <strong>Server:</strong> {{ $json.headers?.server || 'Not available' }}<br> <strong>Response Date:</strong> {{ $json.headers?.date || 'Not available' }}<br> <strong>Checked At:</strong> {{ $now.setZone('Asia/Kolkata').toFormat('dd LLL yyyy, hh:mm:ss a') }}<br> <strong>Response Time:</strong> {{ $json.responseTimeMs }} ms<br> <strong>Performance:</strong> {{ $json.performanceStatus }}<br> {{ $json.downtimeText ? '<strong>Total Downtime:</strong> ' + $json.downtimeText + '<br>' : '' }}</p> <p><strong>Uptime Statistics</strong><br> Uptime (all-time): {{ $json.uptimePercent ?? 'n/a' }}% over {{ $json.totalChecks }} checks<br> Total incidents: {{ $json.incidents }}</p> <p><strong>Possible Causes:</strong></p> <ul> <li>404 - Requested page not found.</li> <li>403 - Access forbidden.</li> <li>401 - Authentication required.</li> <li>400 - Invalid request.</li> <li>429 - Too many requests.</li> </ul> <p><strong>Recommended Action:</strong> Verify the requested URL, access permissions, authentication and server configuration.</p> <p>Please investigate the issue.</p> <p>Regards,<br><strong>Website Monitoring System</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3056,
+        368
+      ],
+      "id": "c3172ea5-a0d5-46e0-8c23-95ed34cd0c94",
+      "name": "Send a message2",
+      "webhookId": "0bcb6611-5ef8-4086-84bf-4bb69396fdee",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dXJVtmm7dYtnzvrC",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "2023.krish.gupta@ves.ac.in",
+        "subject": "=🚨 [SERVER ERROR] {{ $json.name }} – {{ $json.statusCode }}",
+        "message": "= <h2>🚨 Website Server Error Detected</h2> <p>Hello,</p> <p>Our website monitoring system detected a server-side error during the latest health check. Your server is currently unable to process the request successfully.</p> <p> <strong>Website:</strong> {{ $json.name }}<br> <strong>URL:</strong> {{ $json.url }}<br> <strong>Status:</strong> {{ $json.Status }}<br> <strong>Previous Status:</strong> {{ $json.previousState || 'First check' }}<br> <strong>HTTP Status Code:</strong> {{ $json.statusCode }}<br> <strong>Status Message:</strong> {{ $json.statusMessage }}<br> <strong>Server:</strong> {{ $json.headers?.server || 'Not available' }}<br> <strong>Response Date:</strong> {{ $json.headers?.date || 'Not available' }}<br> <strong>Checked At:</strong> {{ $now.setZone('Asia/Kolkata').toFormat('dd LLL yyyy, hh:mm:ss a') }}<br> <strong>Response Time:</strong> {{ $json.responseTimeMs }} ms<br> <strong>Performance:</strong> {{ $json.performanceStatus }}<br> {{ $json.downtimeText ? '<strong>Total Downtime:</strong> ' + $json.downtimeText + '<br>' : '' }}</p> <p><strong>Uptime Statistics</strong><br> Uptime (all-time): {{ $json.uptimePercent ?? 'n/a' }}% over {{ $json.totalChecks }} checks<br> Total incidents: {{ $json.incidents }}</p> <p><strong>Recommended Actions:</strong></p> <ul> <li>Check application and server logs.</li> <li>Verify server health and resource usage.</li> <li>Check database and API connectivity.</li> <li>Investigate hosting infrastructure issues.</li> </ul> <p><strong>Please investigate and resolve this issue as soon as possible.</strong></p> <p>Regards,<br><strong>Website Monitoring System</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3056,
+        560
+      ],
+      "id": "9410da18-dd59-463c-a97c-aaff6f6711a7",
+      "name": "Send a message3",
+      "webhookId": "5d14c43f-4c3a-4595-84d6-bd52a5050966",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dXJVtmm7dYtnzvrC",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "2023.krish.gupta@ves.ac.in",
+        "subject": "=🚨 [UNREACHABLE] {{ $json.name }} Cannot Be Reached",
+        "message": "= <h2>🚨 Website Unreachable</h2> <p>Hello,</p> <p>Our website monitoring system was unable to establish a connection to your website during the latest health check.</p> <p> <strong>Website:</strong> {{ $json.name }}<br> <strong>URL:</strong> {{ $json.url }}<br> <strong>Status:</strong> Website Unreachable<br> <strong>Previous Status:</strong> {{ $json.previousState || 'First check' }}<br> <strong>Error:</strong> {{ $json.error?.message || $json.error?.description || $json.message || 'Connection failed' }}<br> <strong>Checked At:</strong> {{ $now.setZone('Asia/Kolkata').toFormat('dd LLL yyyy, hh:mm:ss a') }}<br> <strong>Time Until Failure:</strong> {{ $json.responseTimeMs }} ms<br></p> <p><strong>Uptime Statistics</strong><br> Uptime (all-time): {{ $json.uptimePercent ?? 'n/a' }}% over {{ $json.totalChecks }} checks<br> Total incidents: {{ $json.incidents }}</p> <p><strong>Possible Causes:</strong></p> <ul> <li>DNS resolution failure.</li> <li>Connection timeout.</li> <li>SSL certificate issues.</li> <li>Server is offline.</li> <li>Network connectivity problems.</li> </ul> <p>Please investigate this issue as soon as possible.</p> <p>Regards,<br><strong>Website Monitoring System</strong></p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2816,
+        752
+      ],
+      "id": "15925321-f1e4-4caa-ac29-01cdc6bec670",
+      "name": "Send a message4",
+      "webhookId": "4ff3552b-f1a7-47c5-91c3-51dc616756a9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dXJVtmm7dYtnzvrC",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -320,
+        1568
+      ],
+      "id": "1131e19a-1aca-40ff-a10c-e75bc58c8ce3",
+      "name": "Daily Report Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ea58HimPI9hOAgdN",
+          "mode": "list",
+          "cachedResultName": "monitor_state",
+          "cachedResultUrl": "/projects/QSG2qgG8NjoYHkb8/datatables/ea58HimPI9hOAgdN"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        1568
+      ],
+      "id": "5b1d6b3d-921a-441f-ade5-500556ac7bd2",
+      "name": "Get Monitor State",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "IIwYRtddseTXX5f0",
+          "mode": "list",
+          "cachedResultName": "check_history",
+          "cachedResultUrl": "/projects/QSG2qgG8NjoYHkb8/datatables/IIwYRtddseTXX5f0"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        128,
+        1568
+      ],
+      "id": "fa963f9b-59bb-439a-a735-d02f63257604",
+      "name": "Get Check History",
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== Daily uptime report built from the two data tables =====\nconst monitors = $('Get Monitor State').all().map(i => i.json).filter(r => r && r.url);\nconst history = $('Get Check History').all().map(i => i.json).filter(r => r && r.url);\nconst now = Date.now();\nconst DAY = 86400000;\n\nconst esc = (v) => String(v ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));\nconst icon = { UP: '🟢', REDIRECT: '🟡', HTTP_ERROR: '🟠', SERVER_ERROR: '🔴', UNREACHABLE: '🔴', UNKNOWN: '⚪' };\nconst pct = (a, b) => (b ? Math.round((a / b) * 10000) / 100 : null);\nconst show = (v, suffix = '') => (v === null || v === undefined ? 'n/a' : v + suffix);\nconst isUp = (s) => s === 'UP' || s === 'REDIRECT';\n\nif (monitors.length === 0) {\n  return [{ json: {\n    subject: '📊 Daily Uptime Report – no data yet',\n    html: '<h2>📊 Daily Uptime Report</h2><p>No monitoring data found in the <strong>monitor_state</strong> table yet. Make sure the monitoring workflow is active.</p>'\n  } }];\n}\n\nconst rows = monitors.map(m => {\n  const h24 = history.filter(h => h.url === m.url && now - new Date(h.checkedAt).getTime() <= DAY);\n  const ms = h24.map(h => Number(h.responseTimeMs)).filter(v => Number.isFinite(v));\n  return {\n    name: m.name,\n    url: m.url,\n    state: m.lastState,\n    uptimeAll: pct(Number(m.upChecks) || 0, Number(m.totalChecks) || 0),\n    uptime24h: pct(h24.filter(h => isUp(h.state)).length, h24.length),\n    checks24h: h24.length,\n    avgMs: ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : null,\n    maxMs: ms.length ? Math.max(...ms) : null,\n    incidents: Number(m.incidents) || 0,\n    totalChecks: Number(m.totalChecks) || 0,\n    lastChangeAt: m.lastChangeAt\n  };\n});\n\nconst down = rows.filter(r => !isUp(r.state)).length;\nconst ist = (iso) => {\n  const d = iso ? new Date(iso) : null;\n  return d && !Number.isNaN(d.getTime())\n    ? d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })\n    : 'n/a';\n};\n\nconst th = 'style=\"padding:8px;border:1px solid #ddd;background:#f3f4f6;text-align:left;\"';\nconst td = 'style=\"padding:8px;border:1px solid #ddd;\"';\n\nconst body = rows.map(r => `<tr>\n  <td ${td}>${icon[r.state] || '⚪'} <strong>${esc(r.name)}</strong><br><small>${esc(r.url)}</small></td>\n  <td ${td}>${esc(r.state)}</td>\n  <td ${td}>${show(r.uptime24h, '%')}<br><small>${r.checks24h} checks</small></td>\n  <td ${td}>${show(r.uptimeAll, '%')}<br><small>${r.totalChecks} checks</small></td>\n  <td ${td}>${show(r.avgMs, ' ms')}<br><small>max ${show(r.maxMs, ' ms')}</small></td>\n  <td ${td}>${r.incidents}</td>\n  <td ${td}>${esc(ist(r.lastChangeAt))}</td>\n</tr>`).join('');\n\nconst html = `<h2>📊 Daily Uptime Report</h2>\n<p><strong>${rows.length}</strong> websites monitored, <strong>${down}</strong> currently having problems.</p>\n<table style=\"border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;\">\n<tr><th ${th}>Website</th><th ${th}>Current state</th><th ${th}>Uptime (24h)</th><th ${th}>Uptime (all-time)</th><th ${th}>Avg response (24h)</th><th ${th}>Incidents</th><th ${th}>Last up/down change</th></tr>\n${body}\n</table>\n<p><small>Uptime counts 2xx and 3xx responses as available.</small></p>\n<p>Regards,<br><strong>Website Monitoring System</strong></p>`;\n\nreturn [{ json: {\n  subject: `📊 Daily Uptime Report – ${rows.length} sites, ${down} with problems`,\n  html,\n  sites: rows\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        1568
+      ],
+      "id": "be74644c-c261-46c9-b8f7-1a5a57988cb2",
+      "name": "Build Uptime Report"
+    },
+    {
+      "parameters": {
+        "sendTo": "2023.krish.gupta@ves.ac.in",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        576,
+        1568
+      ],
+      "id": "256fd702-0919-4bd7-a008-9b15610c9297",
+      "name": "Send Uptime Report",
+      "webhookId": "919c0f7b-1a0c-4618-b778-675f1ea991de",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "dXJVtmm7dYtnzvrC",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## SETUP (do this once)\n1. Create 2 data tables (Data tables tab): **monitor_state** and **check_history**\n2. Open each purple Data Table node and pick the matching table\n3. Re-select the Gmail credential if asked\n4. Activate the workflow\n\n**monitor_state**: url, name, lastState, lastChangeAt, totalChecks, upChecks, incidents\n**check_history**: url, checkedAt, state, statusCode, responseTimeMs",
+        "height": 314,
+        "width": 688
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -80
+      ],
+      "id": "5ed08aa4-8e07-44ef-a748-0178e46ba405",
+      "name": "Note - Setup"
+    },
+    {
+      "parameters": {
+        "content": "## Status change detection + history\nGet Previous State reads the last state of the site from monitor_state. Status Tracker compares it with the current check. Save nodes update monitor_state and append a row to check_history. Mail is sent only when the state changed.",
+        "height": 200,
+        "width": 1000
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        656,
+        -80
+      ],
+      "id": "777c038c-3568-44b8-9243-f4de7b7acf3d",
+      "name": "Note - Tracking"
+    },
+    {
+      "parameters": {
+        "content": "## Daily uptime report\nRuns at 9 AM IST, reads both tables and emails per-site uptime (24h / all-time), avg and max response time, incidents.",
+        "width": 700
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        1376
+      ],
+      "id": "6ee97244-3f38-47d5-8089-579d039e0a96",
+      "name": "Note - Report"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Start Timer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Timer": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Calculate Response Time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unreachable Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Response Time": {
+      "main": [
+        [
+          {
+            "node": "Prepare Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unreachable Website": {
+      "main": [
+        [
+          {
+            "node": "Prepare Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Check": {
+      "main": [
+        [
+          {
+            "node": "Get Previous State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Previous State": {
+      "main": [
+        [
+          {
+            "node": "Status Tracker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Tracker": {
+      "main": [
+        [
+          {
+            "node": "Save Current State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Current State": {
+      "main": [
+        [
+          {
+            "node": "Save Check History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Check History": {
+      "main": [
+        [
+          {
+            "node": "Restore Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Result": {
+      "main": [
+        [
+          {
+            "node": "Status Changed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Changed?": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Send a message3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message3": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message4": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Report Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Monitor State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Monitor State": {
+      "main": [
+        [
+          {
+            "node": "Get Check History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Check History": {
+      "main": [
+        [
+          {
+            "node": "Build Uptime Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Uptime Report": {
+      "main": [
+        [
+          {
+            "node": "Send Uptime Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f5dc41c2-9343-4743-ad55-6f9bef4a4d7c",
+  "meta": {
+    "instanceId": "8da603128042e09eec6c38dde3661f09c43f1b7d5a04697e9c3911e62c4e2292"
+  },
+  "nodeGroups": [],
+  "id": "KQk481EfZZfvaKrC",
+  "tags": []
+}
