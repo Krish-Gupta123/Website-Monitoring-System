@@ -21,13 +21,13 @@
 
 ## Overview
 
-A portfolio project that monitors 6 websites every 5 minutes using an n8n workflow. It measures response time, classifies each result, records check history, and sends email alerts only when a site's state changes. A separate scheduled branch sends a daily uptime report at 9:00 AM IST.
+A portfolio project that monitors six websites every five minutes using an n8n workflow. It measures response time, classifies each result, records check history, and sends email alerts when a monitored site's state changes. A separate daily workflow sends an uptime and response-time report.
 
-The HTTP Request node uses a 15-second timeout, does not follow redirects, and uses `neverError` so HTTP status codes are captured for classification. DNS, timeout, and connection failures are handled as unreachable results.
+The HTTP Request node uses a 15-second timeout, does not follow redirects, and uses `neverError` so HTTP status codes can be captured for classification. DNS, timeout, and connection failures are handled as unreachable results.
 
 ## Key Features
 
-- 🔍 Checks 6 configured websites every 5 minutes — about 1,700 checks per day.
+- 🔍 Checks six configured websites every five minutes — about 1,700 checks per day.
 - ⚡ Grades response time: **Fast** (`<500ms`), **Normal** (`<1s`), **Slow** (`1–3s`), or **Very Slow** (`>3s`).
 - 🧭 Classifies results as **UP** (2xx), **Redirect** (3xx), **HTTP Error** (4xx), **Server Error** (5xx), or **Unreachable** (DNS/timeout/connection failure).
 - 🧠 Compares the latest result against the saved state in `monitor_state` to avoid duplicate alert emails.
@@ -150,14 +150,6 @@ Edit the daily report workflow's schedule and timezone in n8n. The configured re
 ### Daily report workflow
 
 ![Daily uptime report workflow](./Daily%20Uptime%20report%20Workflow.png)
-
-### Email previews
-
-Add screenshots at these paths to display the email previews:
-
-![Alert email preview](./screenshots/alert-email.png)
-
-![Daily report email preview](./screenshots/daily-report.png)
 
 ## Project Structure
 
